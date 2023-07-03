@@ -1,0 +1,8 @@
+// default package
+
+terminals S Z
+
+syntax
+   n ::= Z 
+      | S n
+      
