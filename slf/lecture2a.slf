@@ -49,3 +49,27 @@ theorem plus-right-zero:
         end case
     end induction
 end theorem
+
+theorem plus-commutative:
+    forall p: n1 + n2 = n3
+    exists n2 + n1 = n3
+    proof by induction on p:
+        case rule
+            --------------- plus-zero
+            _: 0 + n2 = n2
+            where n1 := Z
+             and  n3 := n2
+        is
+            proof by theorem plus-right-zero on n2
+        end case
+        case rule
+            p': n1' + n2 = n3'
+            ---------------------- plus-succ
+            _: S n1' + n2 = S n3'
+            where n1 := S n1'
+            and n3 := S n3'        
+        is
+            proof by unproved
+        end case
+    end induction
+end theorem
