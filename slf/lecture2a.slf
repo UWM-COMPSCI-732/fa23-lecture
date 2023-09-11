@@ -37,12 +37,15 @@ end lemma
 theorem plus-right-zero:
     forall n
     exists n + 0 = n
+    // circular: proof by theorem plus-right-zero on n
     proof by induction on n:
-        case 0 is
-            proof by unproved
+        case Z is
+            proof by rule plus-zero
         end case
-        case S n is
-            proof by unproved
+        case S n' is
+            p': n' + 0 = n' by induction hypothesis on n'
+            p: n' + 0 = n' by theorem plus-right-zero on n' // induction hypothesis
+            proof by rule plus-succ on p
         end case
     end induction
 end theorem
