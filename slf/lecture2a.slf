@@ -5,4 +5,44 @@ terminals S Z
 syntax
    n ::= Z 
       | S n
-      
+   
+   0 := Z
+   1 := S Z
+   2 := S S Z
+   3 := S 2
+   4 := S 3
+       
+judgment plus: n1 + n2 = n3
+
+   ---------- plus-zero
+   0 + n = n
+   
+   n1 + n2 = n3
+   ----------------- plus-succ
+   S n1 + n2 = S n3
+   
+lemma easy: 
+    exists 1 + 1 = 2
+    p: 0 + 1 = 1 by rule plus-zero
+    proof by rule plus-succ on p
+end lemma
+
+lemma next:
+    exists 2 + 2 = 4
+    p1: 0 + 2 = 2 by rule plus-zero
+    p2: 1 + 2 = 3 by rule plus-succ on p1
+    p3: 2 + 2 = 4 by rule plus-succ on p2     
+end lemma   
+
+theorem plus-right-zero:
+    forall n
+    exists n + 0 = n
+    proof by induction on n:
+        case 0 is
+            proof by unproved
+        end case
+        case S n is
+            proof by unproved
+        end case
+    end induction
+end theorem
