@@ -101,3 +101,47 @@ theorem plus-commutative:
         end case
     end induction
 end theorem
+
+theorem plus-total:
+    forall n1 
+    forall n2
+    exists n1 + n2 = n3
+    proof by induction on n1:
+        case Z is
+            proof by rule plus-zero
+        end case
+        case S n1' is
+            p': n1' + n2 = n3' by induction hypothesis on n1', n2
+            proof by rule plus-succ on p'
+        end case
+    end induction
+end theorem
+
+judgment equal: n = n
+
+    ----- eq
+    n = n
+    
+theorem plus-unique:
+    forall p3: n1 + n2 = n3
+    forall p4: n1 + n2 = n4
+    exists n3 = n4
+    proof by case analysis on p3:
+        case rule
+            ----------------- plus-zero
+            _: 0 + n2 = n2
+            where n1 := 0
+            and n3 := n2
+        is
+            proof by case analysis on p4:
+                case rule
+                    ------------ plus-zero
+                    _: 0 + n2 = n2
+                    where n4 := n2
+                is
+                    proof by rule eq
+                end case
+            end case analysis
+        end case
+    end case analysis
+end theorem
