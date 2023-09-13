@@ -37,8 +37,9 @@ end lemma
 theorem plus-right-zero:
     forall n
     exists n + 0 = n
+    use induction on n
     // circular: proof by theorem plus-right-zero on n
-    proof by induction on n:
+    proof by case analysis on n:
         case Z is
             proof by rule plus-zero
         end case
@@ -47,8 +48,34 @@ theorem plus-right-zero:
             p: n' + 0 = n' by theorem plus-right-zero on n' // induction hypothesis
             proof by rule plus-succ on p
         end case
-    end induction
+    end case analysis
 end theorem
+
+lemma plus-right-succ:
+    forall p: n1 + n2 = n3
+    exists n1 + S n2 = S n3
+    use induction on p
+    proof by case analysis on p:
+        case rule
+            ------------- plus-zero
+            _: 0 + n2 = n2
+            where n1 := 0
+            and n3 := n2
+        is
+            proof by rule plus-zero
+        end case
+        case rule 
+            p': n1' + n2 = n3'
+            ------------------------- plus-succ
+            _: S n1' + n2 = S n3'
+            where n1 := S n1'
+            and n3 := S n3'
+        is
+            q': n1' + S n2 = S n3' by induction hypothesis on p'
+            proof by rule plus-succ on q'
+        end case
+    end case analysis
+end lemma
 
 theorem plus-commutative:
     forall p: n1 + n2 = n3
@@ -69,7 +96,8 @@ theorem plus-commutative:
             where n1 := S n1'
             and n3 := S n3'        
         is
-            proof by unproved
+            q': n2 + n1' = n3' by induction hypothesis on p'
+            proof by lemma plus-right-succ on q'
         end case
     end induction
 end theorem
