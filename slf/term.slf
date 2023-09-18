@@ -1,0 +1,73 @@
+// default package
+
+terminals true false if then else isavalue
+
+syntax
+   t ::= true
+      | false
+      | if t then t else t
+
+
+judgment eval: t -> t
+
+   --------------- E-IfTrue
+   if true then t1 else t2 -> t1
+   
+   ----------------- E-IfFalse
+   if false then t1 else t2 -> t2
+   
+   t1 -> t1'
+   ------------------------------------------- E-If
+   if t1 then t2 else t3 -> if t1' then t2 else t3
+   
+
+judgment value: t isavalue
+
+   ------------------------ val-true
+   true isavalue
+   
+   ------------------------ val-false
+   false isavalue
+    
+lemma easy:
+    exists if true then false else true -> false
+    proof by rule E-IfTrue
+end lemma
+
+
+theorem progress:
+    forall t
+    exists t isavalue or t -> t'
+    use induction on t
+    proof by case analysis on t:
+        case true is
+            d: true isavalue by rule val-true
+            proof by d
+        end case
+        case false is
+            _: false isavalue by rule val-false
+        end case
+        case if t1 then t2 else t3 is
+            d: t1 isavalue or t1 -> t1' by induction hypothesis on t1
+            _: t -> t' by case analysis on d: // commit to doing an eval, never a vale for "if"
+                case or v1: t1 isavalue is
+                    proof by case analysis on v1:
+                        case rule
+                            --------------- val-true
+                            _: true isavalue
+                            where t1 := true
+                        is
+                            // _: true isavalue by rule val-true
+                            _: if true then t2 else t3 -> t2 by rule E-IfTrue
+                        end case
+                    end case analysis
+                end case
+                case or e1: t1 -> t1' is
+                    proof by rule E-If on e1
+                end case
+            end case analysis
+        end case
+    end case analysis
+end theorem
+// theorem ...
+
