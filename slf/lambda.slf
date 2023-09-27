@@ -1,0 +1,85 @@
+// default package
+
+terminals  lambda isavalue
+      tru id ho omega fls
+
+syntax
+   t ::= x
+      | lambda x . t[x]
+      | t t
+
+   G ::= *
+      | G, x
+   
+   tru := lambda x . lambda x' . x
+   fls := lambda x . lambda x' . x'
+   id := lambda x . x
+   ho := lambda x . (x x)
+   omega := ho ho
+       
+judgment value: t isavalue
+
+   -------------------------- val-fn
+   (lambda x. t[x]) isavalue
+   
+
+judgment cbv: t -> t
+
+    t' isavalue
+   ----------------------------- cbv-beta
+   (lambda x . t[x]) t' -> t[t']   
+   
+   t1 -> t1'
+   ---------------- cbv-1
+   t1 t2 -> t1' t2
+   
+   t1 isavalue
+   t2 -> t2'
+   --------------- cbv-2
+   t1 t2 -> t1 t2'
+   
+   
+// 3.5.7 for lambda calculus
+theorem values-are-normal:
+    forall v: t isavalue
+    forall e: t -> t'
+    exists contradiction
+    proof by case analysis on v:
+        case rule
+            -------------------------------- val-fn
+            _: (lambda x . t1[x]) isavalue
+            where t := lambda x . t1[x]
+        is
+            e': lambda x . t1[x] -> t' by e
+            proof by contradiction on e
+        end case
+
+    end case analysis
+end theorem
+
+// 3.5.8 for lambda calculus
+theorem normal-is-a-value:
+    forall t
+    exists t -> t' or t isavalue
+    proof by induction on t:
+        case lambda x . t1[x] is
+            _: t isavalue by rule val-fn
+        end case
+
+        case t1 t2 is
+            o1: t1 -> t1' or t1 isavalue by theorem normal-is-a-value on t1
+            o2: t2 -> t2' or t2 isavalue by induction hypothesis on t2
+            proof by unproved
+        end case
+
+    end induction
+end theorem
+
+lemma omega-eval :
+    exists omega -> omega
+    v: ho isavalue by rule val-fn
+    _: (lambda x . (x x)) ho -> (ho ho) by rule cbv-beta on v
+end lemma
+
+// theorem ...
+
