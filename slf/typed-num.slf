@@ -1,0 +1,207 @@
+// default package
+
+terminals if then else true false succ pred iszero 
+    isavalue numvalue
+        
+syntax
+   t ::= true 
+      | false
+      | if t then t else t
+      | 0
+      | succ t
+      | pred t
+      | iszero t
+
+judgment evaluation: t -> t
+
+  ----------------------------- E-IfTrue
+  if true then t2 else t3 -> t2
+
+   ------------------------------ E-IfFalse
+   if false then t1 else t2 -> t2
+   
+   t1 -> t1'
+   ------------------------------------------- E-If
+   if t1 then t2 else t3 -> if t1' then t2 else t3
+   
+   t -> t'
+   ----------------- E-Succ
+   succ t -> succ t'
+   
+   t -> t'
+   ----------------- E-Pred
+   pred t -> pred t'
+   
+   ----------- E-PredZero
+   pred 0 -> 0
+   
+   t numvalue
+   ---------------- E-PredSucc
+   pred succ t -> t
+
+   t -> t'
+   ----------------- E-Iszero
+   iszero t -> iszero t'
+   
+   ----------------- E-IszeroZero
+   iszero 0 -> true
+   
+   t numvalue
+   ----------------------- E-IszeroSucc
+   iszero succ t -> false
+
+judgment numvalue: t numvalue
+
+   ---------- nval-zero
+   0 numvalue
+   
+   t numvalue
+   --------------- nval-succ
+   succ t numvalue
+   
+judgment value: t isavalue
+
+   ------------------------ val-true
+   true isavalue
+   
+   ------------------------ val-false
+   false isavalue
+
+   t numvalue
+   ----------- val-nval
+   t isavalue
+   
+terminals num bool
+    
+syntax
+  S,T ::= num
+       | bool
+       
+judgment nice: t : T
+
+    t : num
+    ------------- T-Succ
+    succ t : num
+    
+    t : num
+    --------------- T-Iszero
+    iszero t : bool
+        
+    t : num
+    ----------- T-Pred    
+    pred t : num
+    
+    t1 : bool
+    t2 : T
+    t3 : T
+    --------------------------- T-If
+    if t1 then t2 else t3 : T
+    
+    --------- T-Zero
+    0 : num
+    
+    --------------- T-True
+    true : bool
+    
+    ---------------- T-False
+    false : bool
+        
+// theorem ...
+
+theorem types-unique:
+    forall a: t : bool
+    forall b: t : num
+    exists contradiction
+    proof by induction on a:
+        case rule
+            _: t1 : num
+            --------------------- T-Iszero
+            _: (iszero t1) : bool
+            where t := iszero t1
+        is
+            proof by contradiction on b
+        end case
+
+        case rule
+            a0: t0 : bool
+            a1: t1 : bool
+            a2: t2 : bool
+            --------------------------------- T-If
+            _: (if t0 then t1 else t2) : bool
+            where t := if t0 then t1 else t2
+        is
+            proof by case analysis on b:
+                case rule
+                    b0: t0 : bool
+                    b1: t1 : num
+                    b2: t2 : num
+                    --------------------------------- T-If
+                    _: (if t0 then t1 else t2) : num
+                is
+                    proof by induction hypothesis on a1, b1
+                end case
+
+            end case analysis
+        end case
+
+        case rule
+            ---------------------- T-False
+            _: false : bool
+            where t := false
+        is
+            proof by contradiction on b
+        end case
+
+        case rule
+            ----------------- T-True
+            _: true : bool
+            where t := true
+        is
+            proof by contradiction on b
+        end case
+    end induction
+end theorem
+
+
+judgment hasbad: t !
+
+    t !
+    -------- B-Succ
+    succ t !
+     
+    ---------- B-SuccTrue
+    succ true !
+    
+    ------------- B-SuccFalse
+    succ false !
+    
+    ------------- B-PredFalse
+    pred false !
+
+    t !
+    ------------- B-Iszero
+    iszero t !
+        
+    ------------ B-IsZeroTrue
+    iszero true !
+            
+    t numvalue
+    ------------------------- B-IfNum
+    if t then t1 else t2 !
+    
+    t1 !
+    --------------------------- B-If
+    if t1 then t2 else t3 !
+    
+theorem bad-is-not-nice:
+    forall b: t!
+    forall n: t : T
+    exists contradiction
+    proof by unproved
+end theorem
+
+theorem either-bad-or-nice: // not true!
+    forall t
+    exists t : T or t !
+    proof by unproved
+end theorem
