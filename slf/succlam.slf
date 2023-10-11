@@ -1,0 +1,254 @@
+// default package
+
+terminals if then else true false succ pred iszero 
+    isavalue numvalue lambda
+  
+  terminals num bool
+    
+syntax
+  S,T ::= num
+       | bool
+       | T -> T
+             
+syntax
+   t ::= true 
+      | false
+      | if t then t else t
+      | 0
+      | succ t
+      | pred t
+      | iszero t
+      | t t
+      | x
+      | lambda x . t[x]
+
+   G ::= *
+      | G, x:T
+      
+judgment evaluation: t -> t
+
+  ----------------------------- E-IfTrue
+  if true then t2 else t3 -> t2
+
+   ------------------------------ E-IfFalse
+   if false then t1 else t2 -> t2
+   
+   t1 -> t1'
+   ------------------------------------------- E-If
+   if t1 then t2 else t3 -> if t1' then t2 else t3
+   
+   t -> t'
+   ----------------- E-Succ
+   succ t -> succ t'
+   
+   t -> t'
+   ----------------- E-Pred
+   pred t -> pred t'
+   
+   ----------- E-PredZero
+   pred 0 -> 0
+   
+   t numvalue
+   ---------------- E-PredSucc
+   pred succ t -> t
+
+   t -> t'
+   ----------------- E-Iszero
+   iszero t -> iszero t'
+   
+   ----------------- E-IszeroZero
+   iszero 0 -> true
+   
+   t numvalue
+   ----------------------- E-IszeroSucc
+   iszero succ t -> false
+
+   t2 isavalue
+   ------------------------------- E-AppAbs
+   (lambda x . t1[x]) t2 -> t1[t2]
+   
+   t1 -> t1'
+   ---------------- E-App1
+   t1 t2 -> t1' t2
+   
+   t1 isavalue
+   t2 -> t2'
+   ------------------ E-App2
+   t1 t2 -> t1 t2'
+   
+   
+judgment numvalue: t numvalue
+
+   ---------- nval-zero
+   0 numvalue
+   
+   t numvalue
+   --------------- nval-succ
+   succ t numvalue
+   
+judgment value: t isavalue
+
+   ------------------------ val-true
+   true isavalue
+   
+   ------------------------ val-false
+   false isavalue
+
+   t numvalue
+   ----------- val-nval
+   t isavalue
+   
+   ------------------------- val-fun
+   (lambda x. t[x]) isavalue
+   
+       
+judgment nice: G |- t : T
+assumes G
+
+    G |- t : num
+    ------------- T-Succ
+    G |- succ t : num
+    
+    G |- t : num
+    --------------- T-Iszero
+    G |- iszero t : bool
+        
+    G |- t : num
+    ----------- T-Pred    
+    G |- pred t : num
+    
+    G |- t1 : bool
+    G |- t2 : T
+    G |- t3 : T
+    --------------------------- T-If
+    G |- if t1 then t2 else t3 : T
+    
+    --------- T-Zero
+    G |- 0 : num
+    
+    --------------- T-True
+    G |- true : bool
+    
+    ---------------- T-False
+    G |- false : bool
+        
+    --------------- T-Var
+    G, x:T |- x : T
+    
+    G, x:S|- t[x] : T
+    ----------------------- T-Abs
+    G |- lambda x . t[x] : S -> T
+
+    G |- t1 : S -> T
+    G |- t2 : S
+    --------------------- T-App
+    G |- t1 t2 : T
+    
+lemma substitution:
+    assumes G
+    forall d1: G, x:S |- t1[x] : T
+    forall d2: G |- t2 : S
+    exists G |- t1[t2] : T
+    use induction on d1
+    proof by case analysis on d1:
+        case rule
+            d11: G, x:S |- t11[x] : num
+            ---------------------------- T-Succ
+            _: G, x:S |- (succ t11[x]) : num
+            where T := num
+            and t1[x] := succ t11[x]
+        is
+            d112: G |- t11[t2] : num by lemma substitution on d11, d2
+            proof by rule T-Succ on d112
+        end case
+
+        case rule
+            _: (G, x : S) |- t0[x] : num
+            --------------------- T-Iszero
+            _: (G, x : S) |- (iszero t0[x]) : bool
+        is
+            proof by unproved
+        end case
+
+        case rule
+            _: (G, x : S) |- t0[x] : num
+            ----------------- T-Pred
+            _: (G, x : S) |- (pred t0[x]) : num
+        is
+            proof by unproved
+        end case
+
+        case rule
+            _: (G, x : S) |- t0[x] : bool
+            _: (G, x : S) |- t3[x] : T
+            _: (G, x : S) |- t4[x] : T
+            --------------------------------- T-If
+            _: (G, x : S) |- (if t0[x] then t3[x] else t4[x]) : T
+        is
+            proof by unproved
+        end case
+
+        case rule
+            -------------------- T-Zero
+            _: G, x:S |- 0 : num
+            where T := num
+            and t1[x] := 0
+        is
+            _: G |- 0 : num by rule T-Zero
+        end case
+
+        case rule
+            --------------------- T-True
+            _: (G, x : S) |- true : bool
+        is
+            proof by unproved
+        end case
+
+        case rule
+            ---------------------- T-False
+            _: (G, x : S) |- false : bool
+        is
+            proof by unproved
+        end case
+
+        case rule
+            --------------------- T-Var
+            _: G, x:S |- x : S
+            where T := S
+            and t1[x] := x
+        is
+            proof by d2
+        end case
+
+        case rule
+            --------------------------- T-Var
+            _: G', x':T, x:S |- x' : T
+        is
+            d': G', x':T |- x' : T by rule T-Var
+            proof by d' // automatic weakening to G
+        end case
+
+        case rule
+            d11: G, x:S, x':S' |- t11[x][x'] : T'
+            ------------------------------------------------ T-Abs
+            _: G, x:S |- (lambda x' . t11[x][x']) : (S' -> T')
+            where T := S' -> T'
+            and t1[x] := lambda x' . t11[x][x']
+        is
+            d11e: G, x':S', x:S |- t11[x][x'] : T' by exchange on d11
+            d2w: G, x':S' |- t2 : S by weakening on d2
+            d112: G, x':S' |- t11[t2][x'] : T' by lemma substitution on d11e, d2w
+            proof by rule T-Abs on d112
+        end case
+
+        case rule
+            _: (G, x : S) |- t0[x] : (T0 -> T)
+            _: (G, x : S) |- t3[x] : T0
+            --------------------------- T-App
+            _: (G, x : S) |- (t0[x] t3[x]) : T
+        is
+            proof by unproved
+        end case
+
+    end case analysis
+end lemma
