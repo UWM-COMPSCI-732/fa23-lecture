@@ -160,8 +160,18 @@ lemma can-allocate :
     forall m
     forall t
     exists m <- t = loc n ! m' .
-    proof by unproved
-    // EXTRA: easy induction
+    proof by induction on m:
+        case emp is
+            proof by rule alloc-emp
+        end case
+
+        case t1, m1 is
+            a1: m1 <- t = loc n1 ! m1' by induction hypothesis on m1, t
+            b1: (t1,m1) <- t = loc s n1 ! (t1, m1') by rule alloc-nonemp on a1
+            proof by b1
+        end case
+
+    end induction
 end lemma
 
 
