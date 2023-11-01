@@ -2,14 +2,18 @@
  * Record typing (and eventually subtyping)
  */
 
-terminals unit value
+terminals unit value s
           Unit in fn inl inr of X undefined Top
 
 
 module Nat = org.sasylf.util.Natural
 
-syntax l = Nat.n
+syntax l = Nat.n 
+       ::= 0
+        | s l
 
+1 := s 0
+2 := s 1
     
 syntax
  
@@ -189,6 +193,48 @@ R1 <: R2
 R2 <: R3
 -------- S-RcdTrans
 R1 <: R3
+
+
+lemma test:
+    forall eq1: T1 == {1:{}, 2:{1:Unit,}, 0:Unit,}
+    forall eq2: T2 == {0:Unit, 2:Top,}
+    exists T1 <: T2
+    use inversion on eq1 where T1 := {1:{}, 2:{1:Unit,}, 0:Unit,}
+    use inversion on eq2 where T2 := {0:Unit, 2:Top,}
+    ne10: 1 <> 0 by rule Nat.succ-ne-zero
+    s11: 1:{}, 0:Unit, } <: 0:Unit, 1:{}, } by rule S-RcdPerm on ne10
+    s13: 1:{}, } <: } by rule S-RcdWidth
+    s14: Unit <: Unit by rule S-Refl
+    s12: 0:Unit, 1:{}, } <: 0:Unit, } by rule S-RcdDepth on s14, s13
+    s10: 1:{}, 0:Unit, } <: 0:Unit, } by rule S-RcdTrans on s11, s12
+    ne01: 0 <> 1 by rule Nat.zero-ne-succ
+    ne12: 1 <> 2 by rule Nat.ne-rec on ne01
+    s5: 1:{}, 2:{1:Unit,}, 0:Unit,} <: 2:{1:Unit,}, 1:{}, 0:Unit,} by rule S-RcdPerm on ne12 
+    s8: { 1:Unit, } <: Top by rule S-Top
+    s4: 2:{1:Unit,}, 1:{}, 0:Unit,} <: 2:Top, 0:Unit,} by rule S-RcdDepth on s8, s10
+    s3: 1:{}, 2:{1:Unit,}, 0:Unit,} <: 2:Top, 0:Unit,} by rule S-RcdTrans on s5, s4
+    ne20: 2 <> 0 by rule Nat.succ-ne-zero
+    s2: 2:Top, 0:Unit,} <: 0:Unit, 2:Top,} by rule S-RcdPerm on ne20 
+    s1: 1:{}, 2:{1:Unit,}, 0:Unit,} <: 0:Unit, 2:Top,} by rule S-RcdTrans on s3, s2
+    proof by rule S-Rcd on s1
+end lemma
+
+lemma evaltest:
+    forall e0: t == t1 t2
+    forall e1: t1 == fn x:{0:Unit, 2:Top,} => (x@2)
+    forall e2: t2 == {1={}, 2={1=unit,}, 0=unit,}
+    exists t -> t' and t' -> t'' and t'' value
+    use inversion on e0 where t := t1 t2
+    use inversion on e1 where t1 :=  fn x:{0:Unit, 2:Top,} => (x@2)
+    use inversion on e2 where t2 := {1={}, 2={1=unit,}, 0=unit,}
+    v2: t2 value by unproved
+    ev1: t -> t2 @ 2 by rule E-AppAbs on v2
+    l20: 2 = {1=unit,}, 0=unit, } @ 2 = {1 = unit, } by rule lookup-here
+    l120: 1={}, 2={1=unit,}, 0=unit,} @ 2 = { 1 = unit, } by rule lookup-there on l20
+    ev2: t2@2 -> {1=unit,} by rule E-ProjRcd on v2, l120
+    proof by unproved
+end lemma
+
 
 
 judgment isvar: t : T in Gamma
