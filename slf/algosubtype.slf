@@ -1,0 +1,707 @@
+/* CompSci 732
+ * Algorithmic subtyping
+ */
+
+terminals unit value
+          Unit in fn inl inr of X undefined Top
+
+
+module Nat = org.sasylf.util.Natural
+
+syntax l = Nat.n
+
+    
+syntax
+ 
+t ::= unit
+  | fn x:T => t[x]
+  | x
+  | t t
+  | { r
+  | t @ l
+
+r ::= l=t, r
+   |  }
+   
+S, T ::= Unit
+  | T -> T
+  | { R
+  | Top
+  
+R ::= l:T, R
+   |  }
+  
+   
+Gamma ::= *
+      | Gamma, x : T
+
+
+
+judgment equal: t == t
+
+------ eq
+t == t
+
+judgment tequal: T == T
+
+------ teq
+T == T
+
+judgment requal: r == r
+
+------- req
+r == r
+
+judgment Requal: R == R
+
+------ Req
+R == R
+
+
+judgment lequal = Nat.equal : l == l
+
+judgment lnotequal = Nat.notequal : l <> l
+
+judgment isavalue: t value
+
+
+---------- val-unit
+unit value
+
+-------------------- val-fn
+fn x:T => t[x] value
+
+r value
+---------- val-rcd
+{ r value
+
+judgment risavalue: r value
+
+-------- val-empty
+} value
+
+t value
+r value
+------------ val-more
+(l=t, r) value
+
+
+judgment eval: t -> t
+
+t1 -> t1'
+--------------- E-App1
+t1 t2 -> t1' t2
+
+t1 value
+t2 -> t2'
+--------------- E-App2
+t1 t2 -> t1 t2'
+
+t2 value
+------------------------------ E-AppAbs
+(fn x:T => t1[x]) t2 -> t1[t2]
+
+t -> t'
+---------------- E-Proj
+t @ l -> t' @ l
+
+r -> r'
+-------------- E-Rcd
+{ r -> { r'
+
+{r value
+r @ l = t
+------------ E-ProjRcd
+{r @ l -> t
+
+judgment reval: r -> r
+
+t -> t'
+-------------------- E-RcdHere
+(l=t, r) -> (l=t', r)
+
+t value
+r -> r'
+--------------------- E-RcdThere
+(l=t, r) -> (l=t, r')
+
+
+judgment rlookup: r @ l = t
+
+---------------- lookup-here
+(l=t, r) @ l = t
+
+r @ l = t
+------------------ lookup-there
+(l'=t', r) @ l = t
+
+judgment no-lookup: Gamma |- r@l undefined
+assumes Gamma
+
+---------------------- no-lookup-none
+Gamma |- }@l undefined
+
+l1 <> l2
+Gamma |- r @l2 undefined
+------------------------------ no-lookup-more
+Gamma |- (l1=t1,r)@l2 undefined
+
+
+judgment subtype: T <: T
+
+
+------ S-Refl
+T <: T
+
+T1 <: T2
+T2 <: T3
+-------- S-Trans
+T1 <: T3
+
+-------- S-Top
+T <: Top
+
+S' <: S
+T <: T'
+------------------ S-Arrow
+S -> T <: S' -> T'
+
+R <: R'
+--------------- S-Rcd
+{ R  <: { R' 
+
+
+judgment rcd-subtype: R <: R
+
+------- S-RcdWidth
+R <: }
+
+T <: T'
+R <: R'
+----------------------------- S-RcdDepth
+l:T, R <: l:T', R'
+
+l1 <> l2
+---------------------------------- S-RcdPerm
+l1:T1, l2:T2, R <: l2:T2, l1:T1, R
+
+R1 <: R2
+R2 <: R3
+-------- S-RcdTrans
+R1 <: R3
+
+
+judgment isvar: t : T in Gamma
+assumes Gamma
+
+----------------------- var
+x : T in (Gamma, x : T)
+
+
+judgment type: Gamma |- t : T
+assumes Gamma
+
+-------------------- T-Unit
+Gamma |- unit : Unit
+
+t : T in Gamma
+-------------- T-Var
+Gamma |- t : T
+
+Gamma, x : T1 |- t[x] : T2
+------------------------------------- T-Abs
+Gamma |- (fn x:T1 => t[x]) : T1 -> T2
+
+Gamma |- t1 : T2 -> T1
+Gamma |- t2 : T2
+----------------------- T-App
+Gamma |- t1 t2 : T1
+
+Gamma |- r : R
+-------------------- T-Rcd
+Gamma |- { r : { R
+
+Gamma |- t : { R
+R @ l = T / R'
+-------------------- T-Proj
+Gamma |- t @ l : T
+
+Gamma |- t : S
+S <: T
+---------------- T-Sub
+Gamma |- t : T
+
+
+judgment rtyping: Gamma |- r : R
+assumes Gamma
+
+--------------- T-RcdEmpty
+Gamma |- } : }
+
+Gamma |- t : T
+Gamma |- r : R
+Gamma |- r@l undefined
+-------------------------- T-RcdMore
+Gamma |- (l=t, r) : (l:T, R)
+
+
+// updated to return types of other fields.  Much easier for subtyping
+judgment Rlookup: R @ l = T / R
+
+----------------------- Lookup-here
+(l:T, R) @ l = T / R
+
+l' <> l // added to simplify matters
+R @ l = T / R'
+-------------------------------- Lookup-there
+(l':T', R) @ l = T / (l':T', R')
+
+judgment no-Lookup: R@l undefined
+
+---------------------- no-Lookup-none
+}@l undefined
+
+l1 <> l2
+R @l2 undefined
+------------------------------ no-Lookup-more
+(l1:T1,R)@l2 undefined
+
+
+// New judgments for algorithmic subtyping and algorithmic typing
+
+judgment algorithmic-subtyping: |-> T <: T
+
+------------ SA-Top
+|-> T <: Top
+
+--------------- SA-Unit
+|-> Unit <: Unit
+
+|-> R <: R'
+--------------- SA-Rcd
+|-> {R <: {R'
+
+|-> T1' <: T1
+|-> T2 <: T2'
+-------------------------- SA-Arrow
+|-> T1 -> T2 <: T1' -> T2'
+
+
+// Here we need very different structure to handle the
+// recursive nature of record types.  We peel off the fields
+// in the LHS as they appear in the RHS.
+
+judgment algorithmic-subtyping-rcd: |-> R <: R
+
+---------- SA-RcdEmp
+|-> R <: }
+
+R@l' = T / R1
+|-> T <: T'
+|-> R1 <: R'
+------------------- SA-RcdFld
+|-> R <: (l':T',R')
+
+
+judgment algorithmic-typing: Gamma |-> t : T
+assumes Gamma
+
+t : T in Gamma
+--------------- TA-Var
+Gamma |-> t : T
+
+--------------------- TA-Unit
+Gamma |-> unit : Unit
+
+Gamma, x : T1 |-> t[x] : T2
+-------------------------------------- TA-Abs
+Gamma |-> (fn x:T1 => t[x]) : T1 -> T2
+
+Gamma |-> t1 : T2 -> T1
+Gamma |-> t2 : T2'
+|-> T2' <: T2
+----------------------- TA-App
+Gamma |-> t1 t2 : T1
+
+Gamma |-> t : {R
+R @l = T / R'
+----------------- TA-Proj
+Gamma |-> t@l : T
+
+Gamma |-> r : R
+------------------- TA-Rcd
+Gamma |-> {r : {R
+
+
+judgment algorithmic-rcd-type: Gamma |-> r : R
+assumes Gamma
+
+--------------- TA-RcdEmp
+Gamma |-> } : }
+
+Gamma |-> t : T
+Gamma |-> r : R
+Gamma |- r@l undefined
+---------------------------------------- TA-RcdFld
+Gamma |-> (l=t, r) : (l:T, R)
+
+
+
+lemma rcd-subtype-reflexive: // No need to S-RcdRefl
+    forall R
+    exists R <: R.
+    proof by unproved // XXX
+end lemma
+
+
+lemma type-lookup-deterministic:
+    forall L1: R@l = T1 / R1
+    forall L2: R@l = T2 / R2
+    exists T1 == T2 and R1 == R2 .
+    proof by unproved // XXX
+end lemma
+
+lemma type-lookup-commutes:
+    forall L1: R0 @ l1 = T1 / R1
+    forall L2: R1 @ l2 = T2 / R2
+    forall ne: l1 <> l2
+    exists R0 @ l2 = T2 / R3 and R3 @ l1 = T1 / R2 .
+    proof by unproved // XXX
+end lemma
+
+
+// This is a strange lemma that is useful
+// when proving that record subtyping is sound.
+lemma type-lookup-implies-subtype:
+    forall d: R@l = T/R'
+    exists R <: (l:T,R').
+    proof by unproved // XXX
+end lemma
+
+// This lemma says that either a record type has a label or doesn't
+lemma type-lookup-query:
+    forall R
+    forall l
+    exists R@l undefined or R@l = T/R'.
+    proof by unproved // XXX
+end lemma
+
+
+/// From the previous chapter:
+
+// Lemma 15.3.2 (1)
+lemma subtype-inversion-Arrow:
+    forall d: S <: T1 -> T2
+    exists S == S1 -> S2 and T1 <: S1 and S2 <: T2 .
+    proof by induction on d:
+        case rule
+            ------------ S-Refl
+            _: (T1 -> T2) <: (T1 -> T2)
+            where S := T1 -> T2
+        is
+            eq: S == T1 -> T2 by rule teq
+            d1: T1 <: T1 by rule S-Refl
+            d2: T2 <: T2 by rule S-Refl
+            proof by eq, d1, d2
+        end case
+
+        case rule
+            s1: S <: S'
+            s2: S' <: (T1 -> T2)
+            -------------- S-Trans
+            _: S <: (T1 -> T2)
+        is
+            eq': S' == S1' -> S2' and 
+            d1'': T1 <: S1' and 
+            d2'': S2' <: T2 by induction hypothesis on s2
+            use inversion of rule teq on eq' where S' := S1' -> S2'
+            eq: S == S1 -> S2 and
+            d1': S1' <: S1 and
+            d2': S2 <: S2' by induction hypothesis on s1
+            d1: T1 <: S1 by rule S-Trans on d1'', d1'
+            d2: S2 <: T2 by rule S-Trans on d2', d2''
+            proof by eq, d1, d2
+        end case
+
+        case rule
+            d1: T1 <: S1
+            d2: S2 <: T2
+            ------------------------ S-Arrow
+            _: S1 -> S2 <: T1 -> T2
+            where S := S1 -> S2
+        is
+            eq: S == S1 -> S2 by rule teq
+            proof by eq, d1, d2
+        end case
+
+    end induction
+end lemma
+
+// Version of Lemma 15.3.2 (2)
+lemma subtype-inversion-Rcd:
+    forall d: S <: { R
+    exists S == { R' and R' <: R.
+    proof by induction on d:
+        case rule
+            ------------ S-Refl
+            _: ({ R) <: ({ R)
+            where S := { R
+        is
+            e: S == { R by rule teq
+            s: R <: R by lemma rcd-subtype-reflexive on R
+            proof by e, s
+        end case
+
+        case rule
+            d1: S <: T
+            d2: T <: ({ R)
+            -------------- S-Trans
+            _: S <: ({ R)
+        is
+            et: T == { R'' and
+            s'': R'' <: R by induction hypothesis on d2
+            use inversion of rule teq on et where T := { R''
+            es: S =={ R' and
+            s': R' <: R'' by induction hypothesis on d1
+            s: R' <: R by rule S-RcdTrans on s', s''
+            proof by es, s
+        end case
+
+        case rule
+            s: R' <: R
+            --------------------- S-Rcd
+            _: ({ R') <: ({ R)
+            where S := { R'
+        is
+            es: S == { R' by rule teq 
+            proof by es, s
+        end case
+
+    end induction
+end lemma
+
+// From Homework #9 solution updated for new relation
+lemma subtype-has-subtype-lookup:
+    forall lk: R @ l = T/ R9
+    forall sr: R' <: R
+    exists R' @ l = T'/R9' and T' <: T and R9' <: R9
+    proof by induction on sr:
+        case rule
+            ------------- S-RcdWidth
+            _: R' <: }
+            where R := }
+        is
+            proof by contradiction on lk
+        end case
+
+        case rule
+            st: T1' <: T1
+            sr1: R1' <: R1
+            ----------------------------------- S-RcdDepth
+            _: (l1 : T1', R1') <: (l1 : T1, R1)
+            where R := (l1 : T1, R1)
+             and R' := (l1 : T1', R1')
+        is
+            proof by case analysis on lk:
+                case rule
+                    ------------------------- Lookup-here
+                    _: (l : T, R1) @ l = T/R1
+                    where l1 := l and T1 := T and R9 := R1
+                is
+                    lk': (l1:T1',R1') @ l = T1'/R1' by rule Lookup-here
+                    proof by lk', st, sr1
+                end case
+
+                case rule
+                    ne1: l1 <> l
+                    lk1: R1 @ l = T / R91
+                    ------------------------ Lookup-there
+                    _: (l1 : T1, R1) @ l = T / (l1:T1, R91)
+                    where R9 := (l1:T1, R91)
+                is
+                    lk1': R1' @ l = T'/R91' and 
+                    s: T' <: T and
+                    sr91: R91' <: R91 by induction hypothesis on lk1, sr1
+                    lk': (l1:T1',R1') @ l = T'/(l1:T1',R91') by rule Lookup-there on ne1, lk1'
+                    sr19': (l1:T1',R91') <: (l1:T1,R91) by rule S-RcdDepth on st, sr91
+                    proof by lk', s, sr19'
+                end case
+
+            end case analysis
+        end case
+
+        case rule
+            ne: l0 <> l1
+            ---------------------------------------- S-RcdPerm
+            _: (l0 : T0, (l1 : T1, R0)) <: (l1 : T1, (l0 : T0, R0))
+            where R := (l1 : T1, l0 : T0, R0)
+             and R' := (l0 : T0, l1 : T1, R0)
+        is
+            lk' : R'@l = T/R9' and sr9: R9' <: R9 by case analysis on lk:
+                case rule
+                    ------------------------------------------------- Lookup-here
+                    _: (l : T, (l0 : T0, R0)) @ l = T / (l0:T0, R0)
+                    where l1 := l and T1 := T and R9 := (l0:T0, R0)
+                is
+                    lk1: (l:T, R0) @ l = T/R0 by rule Lookup-here
+                    lk': (l0:T0, l:T, R0) @ l = T/(l0:T0, R0) by rule Lookup-there on ne, lk1
+                    sr9: R9 <: R9 by lemma rcd-subtype-reflexive on R9
+                    proof by lk', sr9
+                end case
+
+                case rule
+                    ne1: l1 <> l
+                    lk0: (l0 : T0, R0) @ l = T / R90
+                    ------------------------------------------------- Lookup-there
+                    _: (l1 : T1, l0 : T0, R0) @ l = T / (l1:T1, R90)
+                    where R9 := (l1:T1, R90)
+                is
+                    proof by case analysis on lk0:
+                        case rule
+                            -------------------------- Lookup-here
+                            _: (l : T, R0) @ l = T / R0
+                            where l0 := l and T0 := T and R90 := R0
+                        is
+                            lk': (l:T, l1:T1, R0)@l = T/(l1:T1, R0) by rule Lookup-here
+                            sr9: R9 <: R9 by lemma rcd-subtype-reflexive on R9
+                            proof by lk', sr9
+                        end case
+
+                        case rule
+                            ne0: l0 <> l
+                            lk0': R0 @ l = T / R900
+                            ------------------------ Lookup-there
+                            _: (l0 : T0, R0) @ l = T / (l0:T0, R900)
+                            where R90 := l0:T0, R900
+                        is
+                            lk1': (l1:T1, R0) @ l = T/(l1:T1,R900) by rule Lookup-there on ne1, lk0'
+                            lk': (l0:T0, l1:T1, R0) @ l = T/(l0:T0, l1:T1, R900) by rule Lookup-there on ne0, lk1'
+                            sr9' : (l0:T0, l1:T1, R900) <: R9 by rule S-RcdPerm on ne
+                            proof by lk', sr9'
+                        end case
+
+                    end case analysis
+                end case
+
+            end case analysis
+            st: T <: T by rule S-Refl
+            proof by lk', st, sr9
+        end case
+
+        case rule
+            sr1: R' <: R''
+            sr2: R'' <: R
+            -------------- S-RcdTrans
+            _: R' <: R
+        is
+            lk'': R'' @ l = T''/R9'' and
+            st'': T'' <: T and
+            sr'': R9'' <: R9 by induction hypothesis on lk, sr2
+            lk': R' @ l = T'/R9' and
+            st': T' <: T'' and
+            sr': R9' <: R9'' by induction hypothesis on lk'', sr1
+            st: T' <: T by rule S-Trans on st', st''
+            sr9: R9' <: R9 by rule S-RcdTrans on sr', sr''
+            proof by lk', st, sr9
+        end case
+
+    end induction
+end lemma
+
+
+/// Algorithmic subtyping lemmas
+// Algorthmic subtyping recurses while going through the record type
+// on the right of the subtype relation label by label.
+// The following four lemmas allow one to do the same thing on the
+// record type on the left of the relation.
+
+// First we have two lemmas that handle the situation that 
+// the label does not occur on the right.
+// The first of the two lets us build an algorithmic subtype relation.
+// The second of the two lets us invert a algorithmic subtype relation.
+
+// This lemma says we can build a subtype if the label
+// is NOT found in the right record type:
+lemma algorithmic-subtyping-no-lookup:
+    forall L1: R1@l = T/R1'
+    forall nL2: R2@l undefined
+    forall sr: |-> R1' <: R2
+    exists |-> R1 <: R2
+    proof by unproved // XXX
+end lemma
+    
+// This lemma says that we can "unwrap" a subtyping using
+// a label on the left not being present in the right:
+lemma algorithmic-subtyping-invert-no-lookup:
+    forall sr: |-> (l:T,R1) <: R2
+    forall NL: R2 @ l undefined
+    exists |-> R1 <: R2
+    proof by unproved // XXX
+end lemma
+
+// Next we have two lemmas that handle the situation that 
+// the label does occur on the right.
+// The first of the two lets us build an algorithmic subtype relation,
+// assuming the type of the lab on the right is a supertype.
+// The second of the two lets us invert a algorithmic subtype relation.
+
+// TODO: MAJOR: State and prove the two lemmas that handle
+// the label being present on the right.  The lemmas should have
+// the same "feel" as the previous ones: obe that builds and one that inverts.
+
+/// Lemma 16.1.2
+// (1) algorithmic-subtyping-reflexive (EASY)
+// (2) algorithmic-subtyping-transitive (DIFFICULT!)
+// Both lemmas require mutual induction with a -rcd variant
+
+lemma algorithmic-subtyping-reflexive:
+    forall T
+    exists |-> T <: T
+    proof by unproved // TODO
+end lemma
+
+lemma algorithmic-subtyping-transitive:
+    forall T2 // See homework sheet
+    forall d12: |-> T1 <: T2
+    forall d23: |-> T2 <: T3
+    exists |-> T1 <: T3.
+    use induction on T2
+    proof by unproved // TODO
+end lemma
+// The hard part of this lemma is the record version
+// You will (eventually) need the two inversion lemmas that allow one to unwrap with respect to
+// the left side of the relation.  One of the lemmas statements was given to you; 
+// the other you need to state and prove (the MAJOR section above).
+
+
+
+
+/// Proposition 16.1.5
+
+theorem algorithmic-subtyping-sound:
+    forall d: |-> S <: T
+    exists S <: T
+    proof by unproved // TODO
+end theorem
+
+theorem algorithmic-subtyping-complete:
+    forall s: S <: T
+    exists |-> S <: T
+    proof by unproved // TODO
+end theorem
+
+// Theorem 16.2.4
+theorem algorithmic-typing-sound:
+    assumes Gamma
+    forall d: Gamma |-> t : T
+    exists Gamma |- t : T
+    proof by unproved // TODO
+end theorem
+
+// Theorem 16.2.5
+theorem minimal-typing:
+    assumes Gamma
+    forall d: Gamma |- t : T
+    exists Gamma |-> t : S and S <: T.
+    proof by unproved // TODO
+end theorem
