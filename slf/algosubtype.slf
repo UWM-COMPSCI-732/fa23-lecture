@@ -627,7 +627,42 @@ lemma algorithmic-subtyping-no-lookup:
     forall nL2: R2@l undefined
     forall sr: |-> R1' <: R2
     exists |-> R1 <: R2
-    proof by unproved // XXX
+    use induction on nL2
+    proof by case analysis on nL2:
+        case rule
+            ---------------------------- no-Lookup-none
+            _: } @ l undefined
+            where R2 := }
+        is
+            proof by rule SA-RcdEmp
+        end case
+
+        case rule
+            ne2: l2 <> l
+            nL2': R2' @ l undefined
+            ------------------------------------ no-Lookup-more
+            _: (l2: T2, R2') @ l undefined
+            where R2 := (l2:T2, R2')
+        is
+            proof by case analysis on sr:
+                case rule
+                    L12': R1' @ l2 = T12 / R12'
+                    s12: |-> T12 <: T2
+                    sr': |-> R12' <: R2'
+                    ------------------------- SA-RcdFld
+                    _: |-> R1' <: (l2 : T2, R2')
+                is
+                    ne2': l <> l2 by theorem Nat.ne-symmetric on ne2
+                    L2: R1 @ l2 = T12 / R12 and
+                    L12: R12 @ l = T / R12' by lemma type-lookup-commutes on L1, L12', ne2'
+                    sr2': |-> R12 <: R2' by induction hypothesis on L12, nL2', sr' 
+                    proof by rule SA-RcdFld on L2, s12, sr2'
+                end case
+
+            end case analysis
+        end case
+
+    end case analysis
 end lemma
     
 // This lemma says that we can "unwrap" a subtyping using
