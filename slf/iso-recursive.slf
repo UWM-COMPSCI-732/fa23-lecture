@@ -1,0 +1,818 @@
+/* CompSci 732/657: Type Systems
+* Fall 2021
+* Homework #11
+*/
+
+
+terminals unit value
+    Unit in fn Rec fold unfold Top
+
+
+syntax
+
+t ::= unit
+| fn x:T => t[x]
+| x
+| t t
+| t,t
+| t@1
+| t@2
+| fold T t
+| unfold T t
+
+T ::= Top
+| Unit
+| T -> T
+| T * T
+| Rec X => T[X]
+| X
+
+Gamma ::= *
+| Gamma, x : T
+
+// Since X is a variable, SASyLF needs us to define a context for it.
+// This context is used only with subtyping (not defined here)
+
+Sigma ::= *
+| Sigma, X <: T
+
+
+
+judgment equality: t == t
+
+------ eq
+t == t
+
+
+judgment typeequality: T == T
+
+------ type-eq
+T == T
+
+
+judgment isavalue: t value
+
+
+---------- val-unit
+unit value
+
+-------------------- val-fn
+fn x:T => t[x] value
+
+t1 value
+t2 value
+------------- val-pair
+(t1,t2) value
+
+t value
+---------------- val-fold
+fold (T) t value
+
+
+judgment eval: t -> t
+
+t1 -> t1'
+--------------- E-App1
+t1 t2 -> t1' t2
+
+t1 value
+t2 -> t2'
+--------------- E-App2
+t1 t2 -> t1 t2'
+
+t2 value
+------------------------------ E-AppAbs
+(fn x:T => t1[x]) t2 -> t1[t2]
+
+t1 value
+t2 value
+--------------- E-PairBeta1
+(t1,t2)@1 -> t1
+
+t1 value
+t2 value
+--------------- E-PairBeta2
+(t1,t2)@2 -> t2
+
+t1 -> t1'
+------------- E-Proj1
+t1@1 -> t1'@1
+
+t1 -> t1'
+------------- E-Proj2
+t1@2 -> t1'@2
+
+t1 -> t1'
+------------------- E-Pair1
+(t1,t2) -> (t1',t2)
+
+t1 value
+t2 -> t2'
+------------------- E-Pair2
+(t1,t2) -> (t1,t2')
+
+//TODO: new evaluation rules
+
+
+judgment isvar: t : T in Gamma
+assumes Gamma
+
+----------------------- var
+x : T in (Gamma, x : T)
+
+
+judgment type: Gamma |- t : T
+assumes Gamma
+
+-------------------- T-Unit
+Gamma |- unit : Unit
+
+t : T in Gamma
+-------------- T-Var
+Gamma |- t : T
+
+Gamma, x : T1 |- t[x] : T2
+------------------------------------- T-Abs
+Gamma |- (fn x:T1 => t[x]) : T1 -> T2
+
+Gamma |- t1 : T2 -> T1
+Gamma |- t2 : T2
+----------------------- T-App
+Gamma |- t1 t2 : T1
+
+Gamma |- t1 : T1
+Gamma |- t2 : T2
+-------------------------- T-Pair
+Gamma |- (t1,t2) : T1 * T2
+
+Gamma |- t : T1 * T2
+-------------------- T-Proj1
+Gamma |- t@1 : T1
+
+Gamma |- t : T1 * T2
+-------------------- T-Proj2
+Gamma |- t@2 : T2
+
+//TODO: new typing rules
+
+
+lemma test-rules:
+    forall Deq: T0 == (Rec X => (X -> X))
+    forall ideq: t1 == fold (T0) (fn x:T0 => x)
+    forall appeq: t2 == fn x1:T0 => (fn x2:T0 => ((unfold (T0) x1) x2))
+    forall idideq: t3 == ((t2 t1) t1)
+    exists * |- t3 : T0 and 
+          t3 -> t31 and 
+          t31 -> t32 and 
+          t32 -> t33 and
+          t33 -> t1.
+    use inversion of rule type-eq on Deq where T0 :=  (Rec X => (X -> X))
+    use inversion of rule eq on ideq where t1 := fold (T0) (fn x:T0 => x)
+    use inversion of rule eq on appeq where t2 := fn x1:T0 => (fn x2:T0 => ((unfold (T0) x1) x2))
+    use inversion of rule eq on idideq where t3 := ((t2 t1) t1)
+    // TODO: 23 steps applying rules to type and evaluate the example
+    proof by ty3, e1, e2, e3, e4
+end lemma
+
+
+lemma canonical-forms-Unit:
+    forall d: * |- t : Unit
+    forall v: t value
+    exists t == unit.
+    // Can't get rid of T-Var with a do-case-analysis
+    // because we run into Unification incomplete
+    proof by case analysis on v:
+        case rule
+            -------------------------- val-fn
+            _: (fn x : T1 => t1[x]) value
+            where t := fn x : T1 => t1[x]
+        is
+            proof by case analysis on d:
+                case rule
+                    var: (fn x : T1 => t1[x]) : Unit in *
+                    -------------------- T-Var
+                    _: * |- (fn x : T1 => t1[x]) : Unit
+                is
+                    proof by contradiction on var
+                end case
+
+            end case analysis
+        end case
+ 
+        case rule
+            --------------------- val-unit
+            _: unit value
+            where t := unit
+        is
+            _: t == unit by rule eq
+        end case
+        case rule
+            _: t1 value
+            _: t2 value
+            ---------------- val-pair
+            _: (t1,t2) value
+            where t := (t1,t2)
+        is
+            proof by case analysis on d:
+                case rule
+                    var: (t1, t2) : Unit in *
+                    -------------------- T-Var
+                    _: * |- (t1, t2) : Unit
+                is
+                    proof by contradiction on var
+                end case
+
+            end case analysis
+        end case
+        // TODO: case for new form of values
+    end case analysis
+end lemma
+
+lemma canonical-forms-Arrow:
+    forall d: * |- t : T1 -> T2
+    forall v: t value
+    exists t == fn x:T1 => t2[x].
+    // can't get rid of T-Var
+    proof by case analysis on v:
+        case rule
+            -------------------------- val-fn
+            _: (fn x : T0 => t2[x]) value
+            where t := fn x : T0 => t2[x]
+        is
+            proof by case analysis on d:
+                case rule
+                    var: (fn x : T0 => t2[x]) : (T1 -> T2) in *
+                    -------------------- T-Var
+                    _: * |- (fn x : T0 => t2[x]) : (T1 -> T2)
+                is
+                    proof by contradiction on var
+                end case
+
+                case rule
+                    _: *, x : T1 |- t2[x] : T2
+                    ------------------------------------------- T-Abs
+                    _: * |- (fn x : T1 => t2[x]) : T1 -> T2
+                    where T0 := T1
+                is
+                    proof by rule eq
+                end case
+
+            end case analysis
+        end case
+        case rule
+            --------------------- val-unit
+            _: unit value
+            where t := unit
+        is
+            proof by case analysis on d:
+                case rule
+                    var: unit : (T1 -> T2) in *
+                    -------------------- T-Var
+                    _: * |- unit : (T1 -> T2)
+                is
+                    proof by contradiction on var
+                end case
+
+            end case analysis
+        end case
+        case rule
+            _: t0 value
+            _: t1 value
+            ---------------- val-pair
+            _: (t0,t1) value
+            where t := (t0,t1)
+        is
+            proof by case analysis on d:
+                case rule
+                    var: (t0, t1) : (T1 -> T2) in *
+                    -------------------- T-Var
+                    _: * |- (t0, t1) : (T1 -> T2)
+                is
+                    proof by contradiction on var
+                end case
+
+            end case analysis
+        end case
+        // TODO: case for new value form (copy and paste from previous lemma)
+    end case analysis
+end lemma  
+
+lemma canonical-forms-Pair:
+    forall d: * |- t : T1 * T2
+    forall v: t value
+    exists t == (t1,t2) and t1 value and t2 value.
+    proof by case analysis on v:
+        case rule
+            -------------------------- val-fn
+            _: (fn x : T0 => t0[x]) value
+            where t := fn x : T0 => t0[x]
+        is
+            proof by case analysis on d:
+                case rule
+                    var: (fn x : T0 => t0[x]) : (T1 * T2) in *
+                    -------------------- T-Var
+                    _: * |- (fn x : T0 => t0[x]) : (T1 * T2)
+                is
+                    proof by contradiction on var
+                end case
+
+            end case analysis
+        end case
+        case rule
+            --------------------- val-unit
+            _: unit value
+            where t := unit
+        is
+            proof by case analysis on d:
+                case rule
+                    var: unit : (T1 * T2) in *
+                    -------------------- T-Var
+                    _: * |- unit : (T1 * T2)
+                is
+                    proof by contradiction on var
+                end case
+
+            end case analysis
+        end case
+        case rule
+            v1: t1 value
+            v2: t2 value
+            ---------------- val-pair
+            _: (t1,t2) value
+            where t := (t1,t2)
+        is
+            eq: t == (t1,t2) by rule eq
+            proof by eq, v1, v2
+        end case
+        // TODO: case for new value form (copy and paste from previous lemma)
+    end case analysis
+end lemma
+
+lemma canonical-forms-Fold :
+    forall d: * |- t : Rec X => T[X]
+    forall v: t value
+    exists t == fold (Rec X => T[X]) t' and t' value
+    proof by case analysis on v:
+        // TODO: prove this
+    end case analysis
+end lemma
+
+
+theorem progress :
+    forall d: * |- t : T
+    exists t value or t -> t' .
+    proof by induction on d:
+        case rule
+            ------------------ T-Unit
+            _: * |- unit : Unit
+            where t := unit and T := Unit
+        is
+            v: unit value by rule val-unit
+        end case
+
+        case rule
+            v: t : T in *
+            ------------- T-Var
+            _: * |- t : T
+        is
+            proof by contradiction on v
+        end case
+
+        case rule
+            d1: *, x:T1 |- t1[x] : T2
+            ------------------------------------ T-Abs
+            _ : * |- fn x:T1 => t1[x] : T1 -> T2
+            where t := fn x:T1 => t1[x]
+            and T := T1 -> T2
+        is
+            v : fn x:T1 => t1[x] value by rule val-fn
+        end case
+
+        case rule
+            d1: * |- t1 : T2 -> T
+            d2: * |- t2 : T2
+            ---------------------- T-App
+            _: * |- t1 t2 : T
+            where t := t1 t2
+        is
+            ns1: t1 value or t1 -> t1' by induction hypothesis on d1
+            ns2: t2 value or t2 -> t2' by induction hypothesis on d2
+            _: t1 t2 -> t' by case analysis on ns1:
+                case or e1: t1 -> t1' is
+                    e: t1 t2 -> t1' t2 by rule E-App1 on e1
+                end case
+                case or v1: t1 value is
+                    proof by case analysis on ns2:
+                        case or e2: t2 -> t2' is
+                            e: t1 t2 -> t1 t2' by rule E-App2 on v1,e2
+                        end case
+                        case or v2: t2 value is
+                            c: t1 == fn x:T2 => t11[x] by lemma canonical-forms-Arrow on d1,v1
+                            use inversion of rule eq on c where t1 := fn x:T2 => t11[x]
+                            proof by rule E-AppAbs on v2
+                        end case
+                    end case analysis
+                end case
+            end case analysis
+        end case
+
+        case rule
+            d1: * |- t1 : T1
+            d2: * |- t2 : T2
+            -------------------- T-Pair
+            _: * |- (t1,t2) : T1 * T2
+            where t := (t1, t2) and T := T1 * T2
+        is
+            ns1: t1 value or t1 -> t1' by induction hypothesis on d1
+            ns2: t2 value or t2 -> t2' by induction hypothesis on d2
+            proof by case analysis on ns1:
+                case or e1: t1 -> t1' is
+                    e: (t1,t2) -> (t1',t2) by rule E-Pair1 on e1
+                end case
+                case or v1: t1 value is
+                    proof by case analysis on ns2:
+                        case or e2: t2 -> t2' is
+                            e: (t1,t2) -> (t1,t2') by rule E-Pair2 on v1,e2
+                        end case
+                        case or v2: t2 value is
+                            v: (t1,t2) value by rule val-pair on v1,v2
+                        end case
+                    end case analysis
+                end case
+            end case analysis
+        end case
+
+        case rule
+            d1: * |- t1 : T1 * T2
+            ------------------------- T-Proj1
+            _ : * |- t1 @ 1 : T1
+            where t := t1 @ 1 and T := T1
+        is
+            ns1: t1 value or t1 -> t1' by induction hypothesis on d1
+            _: t1 @ 1 -> t' by case analysis on ns1:
+                case or  e1: t1 -> t1' is
+                    e: t1 @ 1 -> t1' @ 1 by rule E-Proj1 on e1
+                end case
+                case or v1: t1 value is
+                    eq: t1 == (t11,t12) and 
+                    v11: t11 value and 
+                    v12: t12 value by lemma canonical-forms-Pair on d1,v1
+                    use inversion of rule eq on eq where t1 := (t11,t12)
+                    proof by rule E-PairBeta1 on v11, v12
+                end case
+            end case analysis
+        end case
+
+
+        case rule
+            d1: * |- t1 : T1 * T2
+            ------------------------- T-Proj2
+            _ : * |- t1 @ 2 : T2
+            where t := t1 @ 2 and T := T2
+        is
+            ns1: t1 value or t1 -> t1' by induction hypothesis on d1
+            _: t1 @ 2 -> t' by case analysis on ns1:
+                case or  e1: t1 -> t1' is
+                    e: t1 @ 2 -> t1' @ 2 by rule E-Proj2 on e1
+                end case
+                case or v1: t1 value is
+                    eq: t1 == (t11,t12) and 
+                    v11: t11 value and 
+                    v12: t12 value by lemma canonical-forms-Pair on d1,v1
+                    use inversion of rule eq on eq where t1 := (t11,t12)
+                    proof by rule E-PairBeta2 on v11, v12
+                end case
+            end case analysis
+        end case
+
+        // TODO: recursive types
+    end induction
+end theorem
+
+
+lemma subst :
+    assumes Gamma
+    forall d1: Gamma, x : T2 |- t1[x] : T1
+    forall d2: Gamma |- t2 : T2
+    exists Gamma |- t1[t2] : T1 .
+    _ : Gamma |- t1[t2] : T1 by induction on d1:
+
+        case rule
+            ------------------------------- T-Unit
+            _: Gamma, x : T2 |- unit : Unit
+            where t1[x] := unit and T1 := Unit
+        is
+            _: Gamma |- unit : Unit by rule T-Unit
+        end case
+
+        case rule
+            v: t1[x] : T1 in (Gamma, x:T2)
+            ------------------------------- T-Var
+            _: Gamma, x:T2 |- t1[x] : T1
+        is
+            _: Gamma |- t1[t2] : T1 by case analysis on v:
+                case rule
+                    ------------------------ var
+                    _: x:T2 in (Gamma, x:T2)
+                    where t1[x] := x and T1 := T2
+                is
+                    _: Gamma |- t2 : T2 by d2
+                end case
+                case rule
+                    --------------------------------- var
+                    _: x':T1 in (Gamma', x':T1, x:T2)
+                is
+                    v': x':T1 in (Gamma', x':T1) by rule var
+                    v'': t1[t2]:T1 in Gamma by v'
+                    proof by rule T-Var on v''
+                end case
+            end case analysis
+        end case
+
+        case rule
+            d11: Gamma, x : T2, x' : T2' |- t11[x][x'] : T1'
+            ------------------------------------------------------------ T-Abs
+            _  : Gamma, x : T2 |- (fn x':T2' => t11[x][x']) : T2' -> T1'
+            where t1[x] := (fn x':T2' => t11[x][x']) and T1 := T2' -> T1'
+        is
+            d11r : Gamma, x' : T2', x : T2 |- t11[x][x'] : T1' 
+            by exchange on d11
+            d2' : Gamma, x' : T2' |- t2 : T2
+            by weakening on d2
+            d11': Gamma, x' : T2' |- t11[t2][x'] : T1' 
+            by induction hypothesis on d11r,d2'
+            _: Gamma |- (fn x':T2' => t11[t2][x']) : T2' -> T1' 
+            by rule T-Abs on d11'        
+        end case
+
+        case rule
+            d11: Gamma, x : T2 |- t11[x] : T12 -> T1
+            d12: Gamma, x : T2 |- t12[x] : T12
+            --------------------------------------- T-App
+            _  : Gamma, x : T2 |- t11[x] t12[x] : T1
+            where t1[x] := t11[x] t12[x] 
+        is
+            d11': Gamma |- t11[t2] : T12 -> T1 by induction hypothesis on d11,d2
+            d12': Gamma |- t12[t2] : T12 by induction hypothesis on d12,d2
+            _   : Gamma |- t11[t2] t12[t2] : T1 by rule T-App on d11',d12'
+        end case
+
+        case rule
+            d11: Gamma, x : T2 |- t11[x] : T11
+            d12: Gamma, x : T2 |- t12[x] : T12
+            ------------------------------------------------- T-Pair
+            _  : Gamma, x : T2 |- (t11[x],t12[x]) : T11 * T12
+            where t1[x] := (t11[x],t12[x]) and T1 := T11 * T12
+        is
+            d11': Gamma |- t11[t2] : T11 by induction hypothesis on d11,d2
+            d12': Gamma |- t12[t2] : T12 by induction hypothesis on d12,d2
+            _   : Gamma |- (t11[t2],t12[t2]) : T11 * T12 
+            by rule T-Pair on d11',d12'
+        end case
+
+        case rule
+            d11: Gamma, x : T2 |- t11[x] : T1 * T
+            ------------------------------------- T-Proj1
+            _  : Gamma, x : T2 |- t11[x]@1 : T1
+            where t1[x] := t11[x]@1
+        is
+            d11': Gamma |- t11[t2] : T1 * T by induction hypothesis on d11,d2
+            _   : Gamma |- t11[t2]@1 : T1 by rule T-Proj1 on d11'
+        end case
+
+        case rule
+            d11: Gamma, x : T2 |- t11[x] : T * T1
+            ------------------------------------- T-Proj2
+            _  : Gamma, x : T2 |- t11[x]@2 : T1
+            where t1[x] := t11[x]@2
+        is
+            d11': Gamma |- t11[t2] : T * T1 by induction hypothesis on d11,d2
+            _   : Gamma |- t11[t2]@2 : T1 by rule T-Proj2 on d11'
+        end case
+
+        // TODO: recursive types
+    end induction
+end lemma
+
+
+theorem preservation :
+    forall d: * |- t : T
+    forall e: t -> t'
+    exists * |- t' : T .
+    _ : * |- t' : T by induction on d:
+        case rule
+            ----------------------- T-Unit
+            _: * |- unit : Unit
+            where t := unit and T := Unit
+        is
+            _: * |- t' : Unit by case analysis on e:
+            end case analysis
+        end case
+
+        case rule
+            v: t : T in *
+            ----------------- T-Var
+            _: * |- t : T
+        is
+            _: * |- t' : T by case analysis on v:
+            end case analysis
+        end case
+
+        case rule
+            _: *, x : T1 |- t1[x] : T2
+            ---------------------------------------- T-Abs
+            _: * |- (fn x:T1 => t1[x]) : T1 -> T2
+            where t := (fn x:T1 => t1[x]) and T := T1 -> T2
+        is
+            _: * |- t' : T by case analysis on e:
+            end case analysis
+        end case
+
+        case rule
+            d1: * |- t1 : T2 -> T
+            d2: * |- t2 : T2
+            --------------------------- T-App
+            _ : * |- t1 t2 : T
+            where t := t1 t2
+        is
+            _: * |- t' : T by case analysis on e:
+                case rule
+                    e1: t1 -> t1'
+                    ------------------- E-App1
+                    _ : t1 t2 -> t1' t2
+                    where t' := t1' t2
+                is
+                    d1': * |- t1' : T2 -> T 
+                    by induction hypothesis on d1,e1
+                    _  : * |- t1' t2 : T by rule T-App on d1',d2
+                end case
+                case rule
+                    _ : t1 value
+                    e2: t2 -> t2'
+                    ------------------- E-App2
+                    _ : t1 t2 -> t1 t2'
+                    where t' := t1 t2'
+                is
+                    d2': * |- t2' : T2
+                    by induction hypothesis on d2,e2
+                    _  : * |- t1 t2' : T by rule T-App on d1,d2'
+                end case
+                case rule
+                    _: t2 value
+                    ------------------------------------- E-AppAbs
+                    _: (fn x:T2' => t11[x]) t2 -> t11[t2]
+                    where t1 := (fn x:T2' => t11[x]) and t' := t11[t2]
+                is
+                    v1: (fn x:T2' => t11[x]) value by rule val-fn
+                    proof by case analysis on d1:
+                        case rule
+                            var: (fn x : T2' => t11[x]) : (T2 -> T) in *
+                            ------------------------------------------ T-Var
+                            _: * |- (fn x : T2' => t11[x]) : (T2 -> T)
+                        is
+                            proof by contradiction on var
+                        end case
+
+                        case rule
+                            d11: (*, x : T2) |- t11[x] : T
+                            ------------------------------------------- T-Abs
+                            _: * |- (fn x : T2 => t11[x]) : (T2 -> T)
+                            where T2' := T2
+                        is
+                            proof by lemma subst on d11, d2
+                        end case
+
+                    end case analysis
+                end case
+            end case analysis
+        end case
+
+        case rule
+            d1: * |- t1 : T1
+            d2: * |- t2 : T2
+            ------------------------------ T-Pair
+            _ : * |- (t1,t2) : T1 * T2
+            where t := (t1,t2) and T := T1 * T2
+        is
+            _ : * |- t' : T1 * T2 by case analysis on e:
+                case rule
+                    e1: t1 -> t1'
+                    ---------------------- E-Pair1
+                    _: (t1,t2) -> (t1',t2)
+                    where t' := (t1',t2)
+                is
+                    d1': * |- t1' : T1 by induction hypothesis on d1,e1
+                    _  : * |- (t1',t2) : T1 * T2 by rule T-Pair on d1',d2
+                end case
+                case rule
+                    _ : t1 value
+                    e2: t2 -> t2'
+                    ---------------------- E-Pair2
+                    _: (t1,t2) -> (t1,t2')
+                    where t' := (t1,t2')
+                is
+                    d2': * |- t2' : T2 by induction hypothesis on d2,e2
+                    _  : * |- (t1,t2') : T1 * T2 by rule T-Pair on d1,d2'
+                end case
+            end case analysis
+        end case
+
+        case rule
+            d1: * |- t1 : T * T2
+            ------------------------- T-Proj1
+            _ : * |- t1@1 : T
+            where t := t1@1
+        is
+            proof by case analysis on e:
+                case rule
+                    e1: t1 -> t1'
+                    ----------------- E-Proj1
+                    _ : t1@1 -> t1'@1
+                    where t' := t1'@1
+                is
+                    d1': * |- t1' : T * T2 by induction hypothesis on d1,e1
+                    _  : * |- t1'@1 : T by rule T-Proj1 on d1'
+                end case
+                case rule
+                    v11: t11 value
+                    v12: t12 value
+                    --------------------- E-PairBeta1
+                    _: (t11,t12)@1 -> t11
+                    where t1 := (t11,t12) and t' := t11
+                is
+                    v1: (t11,t12) value by rule val-pair on v11,v12
+                    proof by case analysis on d1:
+                        case rule
+                            var: (t11, t12) : (T * T2) in *
+                            ----------------------------- T-Var
+                            _: * |- (t11, t12) : (T * T2)
+                        is
+                            proof by contradiction on var
+                        end case
+
+                        case rule
+                            d': * |- t' : T
+                            _: * |- t12 : T2
+                            -------------------------------- T-Pair
+                            _: * |- (t11, t12) : (T * T2)
+                        is
+                            proof by d'
+                        end case
+
+                    end case analysis
+                end case
+            end case analysis
+        end case
+
+        case rule
+            d1: * |- t1 : T1 * T
+            ------------------------- T-Proj2
+            _ : * |- t1@2 : T
+            where t := t1@2
+        is
+            proof by case analysis on e:
+                case rule
+                    e1: t1 -> t1'
+                    ----------------- E-Proj2
+                    _ : t1@2 -> t1'@2
+                    where t' := t1'@2
+                is
+                    d1': * |- t1' : T1 * T by induction hypothesis on d1,e1
+                    _  : * |- t1'@2 : T by rule T-Proj2 on d1'
+                end case
+                case rule
+                    v11: t11 value
+                    v12: t12 value
+                    --------------------- E-PairBeta2
+                    _: (t11,t12)@2 -> t12
+                    where t1 := (t11,t12) and t' := t12
+                is
+                    proof by case analysis on d1:
+                        case rule
+                            var: (t11, t12) : (T1 * T) in *
+                            ------------------------------ T-Var
+                            _: * |- (t11, t12) : (T1 * T)
+                        is
+                            proof by contradiction on var
+                        end case
+
+                        case rule
+                            _: * |- t11 : T1
+                            d': * |- t12 : T
+                            -------------------------------- T-Pair
+                            _: * |- (t11, t12) : (T1 * T)
+                        is
+                            proof by d'
+                        end case
+
+                    end case analysis
+                end case
+            end case analysis
+        end case
+
+        // TODO: recursive types
+
+    end induction
+end theorem
+
+
