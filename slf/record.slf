@@ -273,12 +273,12 @@ R @ l = T
 Gamma |- t @ l : T
 
 // Sui generis rule for subtyping:
-/*
+
 Gamma |- t : S
 S <: T
 ---------------- T-Sub
 Gamma |- t : T
-TODO: uncomment this rule. */
+// TODO: uncomment this rule. */
 
 judgment rtyping: Gamma |- r : R
 assumes Gamma
@@ -305,7 +305,11 @@ R @ l = T
 
 // Lemma 15.3.2 (1)
 // TODO: lemma subtype-inversion-Arrow
-
+lemma subtype-inversion-Arrow:
+    forall sb: S <: T1 -> T2
+    exists S == S1 -> S2 and T1 <: S1 and S2 <: T2
+    proof by unproved
+end lemma
 
 /* TODO: This will be needed
 // Lemma 15.3.2 (2)
@@ -335,6 +339,18 @@ lemma canonical-forms-Arrow:
             _: * |- t : T1 -> T2
         is
             proof by contradiction on var
+        end case
+        case rule 
+            d': * |- t : S
+            sb: S <: T1 -> T2
+            --------------------- T-Sub
+            _: * |- t : T1 -> T2
+        is
+            seq: S == S1 -> S2 and
+            sb1: T1 <: S1 and
+            sb2: S2 <: T2 by lemma subtype-inversion-Arrow on sb
+            use inversion on seq where S := S1 -> S2    
+            proof by induction hypothesis on d', v
         end case
         // TODO: Handle T-Sub here too
     end case analysis

@@ -20,7 +20,7 @@ t ::= unit
 | fold T t
 | unfold T t
 
-T ::= Top
+T, U ::= Top
 | Unit
 | T -> T
 | T * T
@@ -114,6 +114,121 @@ t2 -> t2'
 //TODO: new evaluation rules
 
 
+theorem demo :
+    forall e: t -> t'
+    forall eq: t' == unit
+    exists contradiction
+    proof by case analysis on eq:
+        case rule
+            ------------ eq
+            _: unit == unit
+            where t':= unit
+        is
+            proof by case analysis on e:
+                case rule
+                    _: unit value
+                    _: t0 value
+                    --------------------- E-PairBeta1
+                    _: ((unit, t0) @ 1) -> unit
+                is
+                    proof by unproved
+                end case
+
+                case rule
+                    _: t0 value
+                    _: unit value
+                    --------------------- E-PairBeta2
+                    _: ((t0, unit) @ 2) -> unit
+                is
+                    proof by unproved
+                end case
+
+            end case analysis
+        end case
+
+    end case analysis
+    proof by case analysis on e:
+        case rule
+            _: t0 -> t1
+            --------------------- E-App1
+            _: (t0 t2) -> (t1 t2)
+        is
+            proof by contradiction on eq
+        end case
+
+        case rule
+            _: t0 value
+            _: t1 -> t2
+            --------------------- E-App2
+            _: (t0 t1) -> (t0 t2)
+        is
+            proof by unproved
+        end case
+
+        case rule
+            _: t0 value
+            ------------------------------------ E-AppAbs
+            _: ((fn x : T0 => t1[x]) t0) -> t1[t0]
+            where t' := t1[t0]
+        is
+            proof by case analysis on eq:
+            end case analysis
+        end case
+
+        case rule
+            _: t' value
+            _: t0 value
+            --------------------- E-PairBeta1
+            _: ((t', t0) @ 1) -> t'
+        is
+            proof by unproved
+        end case
+
+        case rule
+            _: t0 value
+            _: t' value
+            --------------------- E-PairBeta2
+            _: ((t0, t') @ 2) -> t'
+        is
+            proof by unproved
+        end case
+
+        case rule
+            _: t0 -> t1
+            ------------------- E-Proj1
+            _: (t0 @ 1) -> (t1 @ 1)
+        is
+            proof by unproved
+        end case
+
+        case rule
+            _: t0 -> t1
+            ------------------- E-Proj2
+            _: (t0 @ 2) -> (t1 @ 2)
+        is
+            proof by unproved
+        end case
+
+        case rule
+            _: t0 -> t1
+            ------------------------- E-Pair1
+            _: (t0, t2) -> (t1, t2)
+        is
+            proof by unproved
+        end case
+
+        case rule
+            _: t0 value
+            _: t1 -> t2
+            ------------------------- E-Pair2
+            _: (t0, t1) -> (t0, t2)
+        is
+            proof by unproved
+        end case
+
+    end case analysis
+end theorem
+
 judgment isvar: t : T in Gamma
 assumes Gamma
 
@@ -155,6 +270,10 @@ Gamma |- t@2 : T2
 
 //TODO: new typing rules
 
+U == Rec X => T[X]
+Gamma |- t : U
+--------------------------------- T-Unfold
+Gamma |- unfold (U) t : T[U]
 
 lemma test-rules:
     forall Deq: T0 == (Rec X => (X -> X))
@@ -174,6 +293,24 @@ lemma test-rules:
     proof by ty3, e1, e2, e3, e4
 end lemma
 
+
+lemma alt-canonical-forms-Unit:
+    forall d : * |- t : T
+    forall eqt: T == Unit
+    forall v: t value
+    exists t == unit
+    do case analysis on d:
+        case rule
+            var: t : T in *
+            ------------------- T-Var
+            _: * |- t : T
+        is
+            proof by contradiction on var
+        end case
+    end case analysis
+    use inversion on eqt where T := Unit
+    proof by unproved
+end lemma 
 
 lemma canonical-forms-Unit:
     forall d: * |- t : Unit
