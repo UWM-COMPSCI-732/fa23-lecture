@@ -1,0 +1,248 @@
+package edu.uwm.cs732;
+
+/* 
+ * Annotated solution to POPLMark Challenge 2a
+ *
+ * Author: Jonathan Aldrich and John Boyland
+ * 
+ * This file defines System F_sub and proves type safety as specified in POPLMark
+ * challenge problem 2a.
+ */
+
+
+/** SASyLF programs explicitly declare terminals that are
+ * used to parse expressions.  This helps the SASyLF parser
+ * detect problems in the input grammar--anything that is not
+ * a declared terminal, non-terminal, or variable must be an error.
+ * The user should declare all identifiers used in syntax and judgment
+ * that do not themselves denote syntactic classes.  Symbols like
+ * + or |- do not need to be declared, even if they are terminals.
+ */
+terminals lambda all Top value
+
+
+/************************ SYNTAX **************************************/
+
+/** The syntax section declares the syntax of the formal
+ * system, in this case of the lambda calculus.  Syntax is
+ * given using an ordinary BNF grammar.
+ */
+syntax
+
+/** This declaration declares t as a nonterminal.  t and variants of t
+ * (t', t'', t1, t2, etc.--you can add primes or numbers) are used as
+ * metavariables for this syntactic category, as commonly used in the
+ * PL research literature.
+ *
+ * We use the notation t[x] to denote that the variable x is bound in t.
+ * Any uses of the same variable in a binding, such as lam "x" : ... are
+ * treated as the binding occurence where the name of the variable is
+ * defined.
+ */
+t ::= lambda x:T => t[x]
+
+/** To what syntactic class does the variable x refer?  We specify that
+ * by including a case "x" in the grammar for t.
+ */
+
+ | x
+ | t t
+ | lambda X <: T => t[X]
+
+ /** Brackets are special in SASyLF, so we use quotes to turn them into
+  * terminals.
+  */
+ | t "[" T "]" 
+
+
+/** Here we define the syntax of types (either S or T can be used) */
+
+S, T ::= X
+ | Top
+ | S -> T
+ | all X <: S => T[X]
+
+
+/** The form of contexts.  Judgments that use this as a variable
+ * context will say "assumes Gamma."  SASyLF uses built-in semantics for
+ * these contexts, allowing properties like substitution, weakening, and
+ * exchange.  We require that contexts that are understood using these
+ * built-in semantics have a recursive structure that binds exactly one
+ * variable at each level.
+ */ 
+
+Gamma ::= *
+      |   Gamma, x : T
+      |   Gamma, X <: T
+
+
+/************************ JUDGMENTS **************************************/
+
+/** We declare a judgment with a name ("value") and a form ("t value").
+ * The judgment is then followed by a series of inference rules that define
+ * the judgment's semantics.
+ *
+ * With respect to POPLMark, this is not quite as syntactically nice as
+ * defining values using a grammar that happens to be a subset of the term
+ * grammar.  We hope this can be implemented as syntactic sugar in the
+ * future.
+ */
+
+judgment value: t value
+
+----------------------- V-Abs
+lambda x:T => t[x] value
+
+-------------------------- V-Tabs
+lambda X <: T => t[X] value
+
+
+
+/** The evaluation judgment.  Rules are defined with the premises above the line
+ * and the conclusion below the line.
+ *
+ * With respect to POPLMark, we are using context evaluation rules rather than
+ * explicit evaluation contexts.  I'm guessing it would be possible to encode
+ * things using explicit evaluation contexts, but unless we "built in" contexts
+ * I think the metatheory would be extremely complicated.  The best solution in
+ * SASyLF is thus probably the one below, but investigating better support for
+ * the "explicit context style" could be useful future work.
+ */
+
+judgment reduce: t -> t
+
+t1 -> t1'
+------------------- E-CtxApp1
+t1 t2 -> t1' t2
+
+t1 -> t1'
+------------------------------- E-CtxTapp
+t1 "[" T2 "]" -> t1' "[" T2 "]"
+
+t1 value
+t2 -> t2'
+------------------- E-CtxApp2
+(t1 t2) -> (t1 t2')			// the parentheses are not necessary here, but can be used to disambiguate
+							// expressions that otherwise can be parsed more than one way 
+
+/** Substitution is built into SASyLF.  Here, we see that t has the variable x bound in it.
+ * We substitute t2 for x in t12 using the notation t12[t2].
+ */
+
+t2 value
+------------------------------------- E-AppAbs
+(lambda x:S => t12[x]) t2 -> t12[t2]
+
+------------------------------------------------ E-TappTabs
+(lambda X <: S => t12[X]) "[" T2 "]" -> t12[T2]
+
+
+/** The typing judgment uses a list of assumptions for variable types.
+ * This is just like the LF context in Twelf.  More details on how this works will
+ * come later, but the gist is that it gives us a bunch of theorems for free,
+ * including substitution, weakening, contraction, and exchange.
+ */
+
+judgment has-type: Gamma |- t : T
+assumes Gamma
+
+
+/** This rule shows how to use an assumption in Gamma to determine that a variable
+ * is well-typed.  These assumption-using rules have a special form: no premises are
+ * allowed, exactly one variable must be free in Gamma, and one variable free in the
+ * main judgment.
+ */
+
+------------------- T-Var
+Gamma, x:T |- x : T
+
+
+Gamma, x:T1 |- t2[x] : T2
+--------------------------------------- T-Abs
+Gamma |- lambda x:T1 => t2[x] : T1 -> T2
+
+
+Gamma |- t1 : T11 -> T12
+Gamma |- t2 : T11
+---------------------------------- T-App
+Gamma |- t1 t2 : T12
+
+
+Gamma, X <: T1 |- t2[X] : T2[X]
+------------------------------------------------------- T-Tabs
+Gamma |- lambda X <: T1 => t2[X] : all X <: T1 => T2[X]
+
+
+Gamma |- t1 : all X <: T11 => T12[X]
+Gamma |- T2 <: T11
+----------------------------------- T-Tapp
+Gamma |- t1 "[" T2 "]" : T12[T2]
+
+
+Gamma |- t : S
+Gamma |- S <: T
+---------------- T-Sub
+Gamma |- t : T
+
+
+
+/** The subtyping judgment
+ */
+
+judgment subtyping: Gamma |- T <: S
+assumes Gamma
+
+
+----------------- S-Top
+Gamma |- T <: Top
+
+
+/** As in the Twelf solution, we provide standard variable, reflexivity, and
+ * transitivity rules rather than their algorithmic variants.  I believe
+ * the algorithmic rules could be encoded at some cost to the metatheory,
+ * but it would be awkward because we wouldn't be able to use the built-in
+ * variable rule, and would instead have to have the variable use come from
+ * a different judgment.
+ */
+
+----------------------- S-Var
+Gamma, X <: T |- X <: T
+
+
+----------------------- S-Refl
+Gamma |- T <: T
+
+
+Gamma |- T1 <: T2
+Gamma |- T2 <: T3
+----------------------- S-Trans
+Gamma |- T1 <: T3
+
+
+Gamma |- T1 <: S1
+Gamma |- S2 <: T2
+------------------------------- S-Arrow
+Gamma |- S1 -> S2 <: T1 -> T2
+
+
+Gamma |- T1 <: T1'
+Gamma, X <: T1 |- T2'[X] <: T2[X]
+------------------------------------------------------- S-All
+Gamma |- all X' <: T1' => T2'[X'] <: all X <: T1 => T2[X] 
+
+
+
+/** equality judgment, used in canonical forms lemma */
+
+judgment equality: t == t
+
+------ equality
+t == t
+
+
+judgment type-equality: T == T
+
+------ type-equality
+T == T
+
+
